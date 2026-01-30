@@ -13,69 +13,272 @@
       background: #0f172a;
       color: #e5e7eb;
     }
-    h1 {
-      font-size: 18px;
-      margin-bottom: 12px;
-    }
+    h1 { font-size: 18px; margin: 0 0 12px 0; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
     .box {
       background: #111827;
-      border: 1px solid #1f2933;
+      border: 1px solid #1f2937;
       padding: 12px;
+      border-radius: 8px;
       margin-bottom: 12px;
+      flex: 1 1 320px;
+      min-width: 280px;
+    }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid #334155;
+      background: #0b1220;
+      margin-left: 8px;
     }
     button {
       padding: 8px 12px;
-      margin-right: 8px;
+      margin: 6px 8px 0 0;
       background: #2563eb;
       color: white;
       border: none;
-      border-radius: 4px;
+      border-radius: 6px;
       cursor: pointer;
     }
+    button.secondary { background: #334155; }
+    button.danger { background: #dc2626; }
     pre {
       white-space: pre-wrap;
       font-size: 12px;
       background: #020617;
-      padding: 8px;
-      max-height: 200px;
+      border: 1px solid #1f2937;
+      padding: 10px;
+      border-radius: 8px;
+      max-height: 220px;
       overflow: auto;
+      margin: 10px 0 0 0;
     }
+    .adbox {
+      height: 120px;
+      border-radius: 10px;
+      border: 1px dashed #64748b;
+      display: grid;
+      place-items: center;
+      color: #cbd5e1;
+      background: rgba(2, 6, 23, 0.35);
+      margin-top: 10px;
+    }
+    .small { font-size: 12px; color: #94a3b8; }
+    a { color: #93c5fd; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
   </style>
 </head>
+
 <body>
-
   <h1>📱 Ads Test WebView</h1>
-
-  <div class="box">
-    <strong>Status</strong>
-    <div id="status">Page chargée</div>
+  <div class="small">
+    Paramètres utiles :
+    <code>?debug=1</code>,
+    <code>?cmp=stub</code>,
+    <code>?reset=1</code>
   </div>
 
-  <div class="box">
-    <button onclick="log('Log test cliqué')">Log test</button>
-    <button onclick="clearLogs()">Clear logs</button>
-  </div>
+  <div class="row">
+    <div class="box">
+      <strong>Status</strong>
+      <div style="margin-top:6px;">
+        Consent: <span id="consentPill" class="pill">UNKNOWN</span><br/>
+        Ads: <span id="adsPill" class="pill">BLOCKED</span><br/>
+        Source: <span id="cmpPill" class="pill">STUB</span>
+      </div>
 
-  <div class="box">
-    <strong>Console logs</strong>
-    <pre id="logs"></pre>
+      <div style="margin-top:10px;">
+        <button onclick="cmpAcceptAll()">Accept all</button>
+        <button class="secondary" onclick="cmpRefuseAll()">Refuse all</button>
+        <button class="danger" onclick="resetAll()">Reset storage</button>
+      </div>
+
+      <div class="adbox" id="adBox">
+        🧱 Slot pub (placeholder)
+      </div>
+
+      <div class="small" style="margin-top:10px;">
+        Cette version utilise un CMP <b>stub</b> pour tester le “gating”.
+        Prochaine étape : brancher Didomi + GPT/GAM.
+      </div>
+    </div>
+
+    <div class="box">
+      <strong>Console logs</strong>
+      <pre id="logs"></pre>
+      <div style="margin-top:10px;">
+        <button class="secondary" onclick="clearLogs()">Clear logs</button>
+        <button class="secondary" onclick="copyDiagnostics()">Copy diagnostics</button>
+      </div>
+    </div>
   </div>
 
   <script>
+    // ---------- Helpers ----------
     const logsEl = document.getElementById('logs');
+    const consentPill = document.getElementById('consentPill');
+    const adsPill = document.getElementById('adsPill');
+    const cmpPill = document.getElementById('cmpPill');
+    const adBox = document.getElementById('adBox');
 
-    function log(msg) {
-      const line = `[${new Date().toISOString()}] ${msg}`;
+    function qs() {
+      const p = new URLSearchParams(location.search);
+      return {
+        debug: p.get('debug') === '1',
+        cmp: p.get('cmp') || 'stub',
+        reset: p.get('reset') === '1',
+      };
+    }
+
+    function log(msg, obj) {
+      const line = `[${new Date().toISOString()}] ${msg}` + (obj ? ` ${JSON.stringify(obj)}` : '');
       console.log(line);
       logsEl.textContent += line + '\n';
     }
 
-    function clearLogs() {
-      logsEl.textContent = '';
+    function clearLogs() { logsEl.textContent = ''; }
+
+    function setPill(el, text) { el.textContent = text; }
+
+    function setAdPlaceholder(stateText) {
+      adBox.textContent = stateText;
     }
 
-    log('Page initialisée');
-  </script>
+    // ---------- "CMP stub" storage ----------
+    // We'll store a simple value to simulate consent.
+    // consent_state: "accepted" | "refused" | null
+    const CONSENT_KEY = 'ads_test_consent_state';
 
+    function getConsentState() {
+      return localStorage.getItem(CONSENT_KEY); // "accepted" | "refused" | null
+    }
+
+    function setConsentState(state) {
+      if (state === null) localStorage.removeItem(CONSENT_KEY);
+      else localStorage.setItem(CONSENT_KEY, state);
+    }
+
+    // ---------- Ads gating logic (placeholder) ----------
+    let adsInitialized = false;
+
+    function canRequestAds() {
+      // In real life with Didomi/TCF, you'd check GDPR applies + TC string/purposes.
+      // For this stub:
+      const s = getConsentState();
+      return s === 'accepted' || s === 'refused';
+    }
+
+    function initAdsOnce() {
+      if (adsInitialized) return;
+      adsInitialized = true;
+      log('ADS_INIT (placeholder)');
+      // Placeholder rendering
+      setAdPlaceholder('🟩 Ads init OK (placeholder)');
+      setPill(adsPill, 'READY');
+    }
+
+    function refreshAds() {
+      if (!canRequestAds()) {
+        log('ADS_REFRESH_BLOCKED (consent unknown)');
+        setPill(adsPill, 'BLOCKED');
+        setAdPlaceholder('🟥 Ads bloquées : consent UNKNOWN');
+        return;
+      }
+      initAdsOnce();
+      const s = getConsentState();
+      log('ADS_REFRESH (placeholder)', { consent_state: s });
+      setAdPlaceholder(`🟦 Ad request simulée (consent=${s})`);
+    }
+
+    function applyUiFromState() {
+      const s = getConsentState();
+      if (!s) {
+        setPill(consentPill, 'UNKNOWN');
+        setPill(adsPill, 'BLOCKED');
+        setAdPlaceholder('🟥 Ads bloquées : consent UNKNOWN');
+      } else {
+        setPill(consentPill, s.toUpperCase());
+        // Ads can be requested, but we still only refresh explicitly or on init.
+        setPill(adsPill, adsInitialized ? 'READY' : 'PENDING');
+        if (!adsInitialized) setAdPlaceholder('🟨 Consent OK — Ads pas encore initialisées');
+      }
+    }
+
+    // ---------- UI actions ----------
+    function cmpAcceptAll() {
+      setConsentState('accepted');
+      log('CMP_STUB_ACCEPT_ALL');
+      applyUiFromState();
+      // Typical behavior: refresh ads after consent action
+      refreshAds();
+    }
+
+    function cmpRefuseAll() {
+      setConsentState('refused');
+      log('CMP_STUB_REFUSE_ALL');
+      applyUiFromState();
+      refreshAds();
+    }
+
+    async function resetAll() {
+      log('RESET_STORAGE_REQUESTED');
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch (e) { /* ignore */ }
+      // Soft reset state
+      adsInitialized = false;
+      applyUiFromState();
+      // Optional: reload with reset removed
+      log('RESET_DONE');
+    }
+
+    async function copyDiagnostics() {
+      const diag = {
+        url: location.href,
+        userAgent: navigator.userAgent,
+        consent_state: getConsentState(),
+        adsInitialized,
+        ts: new Date().toISOString()
+      };
+      const text = JSON.stringify(diag, null, 2);
+      try {
+        await navigator.clipboard.writeText(text);
+        log('DIAGNOSTICS_COPIED');
+      } catch (e) {
+        log('DIAGNOSTICS_COPY_FAILED', { error: String(e) });
+      }
+    }
+
+    // ---------- Boot ----------
+    (function boot() {
+      const p = qs();
+      setPill(cmpPill, (p.cmp || 'stub').toUpperCase());
+
+      if (p.reset) {
+        // If reset=1 in URL, wipe once and reload without reset
+        try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+        const u = new URL(location.href);
+        u.searchParams.delete('reset');
+        log('RESET_VIA_URL_DONE_RELOADING');
+        location.replace(u.toString());
+        return;
+      }
+
+      log('BOOT', { params: p });
+      applyUiFromState();
+
+      // In real integration, you'd listen to Didomi / __tcfapi readiness, then refreshAds().
+      // Here, we keep it explicit: if consent already stored, auto-refresh once.
+      if (canRequestAds()) {
+        log('CONSENT_ALREADY_KNOWN => AUTO_REFRESH');
+        refreshAds();
+      } else {
+        log('WAITING_FOR_CONSENT');
+      }
+    })();
+  </script>
 </body>
 </html>
