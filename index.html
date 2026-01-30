@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Ads Test WebView</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #0f172a;
+      color: #e5e7eb;
+    }
+    h1 {
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+    .box {
+      background: #111827;
+      border: 1px solid #1f2933;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    button {
+      padding: 8px 12px;
+      margin-right: 8px;
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    pre {
+      white-space: pre-wrap;
+      font-size: 12px;
+      background: #020617;
+      padding: 8px;
+      max-height: 200px;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>📱 Ads Test WebView</h1>
+
+  <div class="box">
+    <strong>Status</strong>
+    <div id="status">Page chargée</div>
+  </div>
+
+  <div class="box">
+    <button onclick="log('Log test cliqué')">Log test</button>
+    <button onclick="clearLogs()">Clear logs</button>
+  </div>
+
+  <div class="box">
+    <strong>Console logs</strong>
+    <pre id="logs"></pre>
+  </div>
+
+  <script>
+    const logsEl = document.getElementById('logs');
+
+    function log(msg) {
+      const line = `[${new Date().toISOString()}] ${msg}`;
+      console.log(line);
+      logsEl.textContent += line + '\n';
+    }
+
+    function clearLogs() {
+      logsEl.textContent = '';
+    }
+
+    log('Page initialisée');
+  </script>
+
+</body>
+</html>
